@@ -84,24 +84,52 @@ resource "aws_security_group" "instance" {
 }
 
 resource "aws_instance" "app" {
-  ami                         = var.ami_id
-  instance_type               = var.instance_type
-  subnet_id                   = aws_subnet.public.id
-  vpc_security_group_ids      = [aws_security_group.instance.id]
+  # AMI (Amazon Machine Image) used to launch the EC2 instance.
+  # The AMI ID is provided through a Terraform variable.
+  ami = var.ami_id
+
+  # EC2 instance size, such as t2.micro or t3.small.
+  instance_type = var.instance_type
+
+  # Launch the EC2 instance inside the public subnet we created.
+  subnet_id = aws_subnet.public.id
+
+  # Attach the security group that controls inbound and outbound traffic.
+  vpc_security_group_ids = [aws_security_group.instance.id]
+
+  # Assign a public IPv4 address so the instance can be accessed externally.
   associate_public_ip_address = true
 
+  # Generate the EC2 startup script using our user_data.sh.tftpl template.
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
-    app_port       = var.app_port
+
+    # Pass the application port to the startup script.
+    app_port = var.app_port
+
+    # Read the actual Python application source code and encode it in Base64.
+    # This allows us to transfer the file through EC2 user_data.
     app_source_b64 = base64encode(file("${path.module}/../../intern-task-app/app/app.py"))
+
+    # Read the application's Dockerfile and encode it in Base64.
     dockerfile_b64 = base64encode(file("${path.module}/../../intern-task-app/Dockerfile"))
-    linux_user     = var.linux_user
-    ssh_cidr       = var.ssh_cidr
+
+    # Pass the Linux username that will be created on the EC2 instance.
+    linux_user = var.linux_user
+
+    # Pass the allowed SSH source CIDR to configure restricted SSH access.
+    ssh_cidr = var.ssh_cidr
   })
 
-  # Cloud-init runs only on first boot. Do not replace the instance merely
-  # because Terraform user_data changes; an existing host needs reprovisioning.
+  # Prevent Terraform from replacing the EC2 instance just because user_data
+  # changes. Important: EC2 user_data normally runs during initial boot;
+  # changing it does not automatically rerun the script on an existing host.
   user_data_replace_on_change = false
 
+  # Add a Name tag to make the EC2 instance identifiable in AWS.
+  tags = {
+    Name = "${var.name}-app"
+  }
+}
   tags = {
     Name = "${var.name}-app"
   }
