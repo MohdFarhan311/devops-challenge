@@ -130,7 +130,4 @@ resource "aws_instance" "app" {
     Name = "${var.name}-app"
   }
 }
-  tags = {
-    Name = "${var.name}-app"
-  }
-}
+
